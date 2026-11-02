@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Niche Radar · 每日需求挖掘</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-icon" aria-hidden="true"><span class="brand-ping"></span></div>
+      <div class="brand-name"><strong>Niche Radar</strong><small>独立开发者的需求雷达</small></div>
+      <button type="button" class="open-tab" id="open-tab" title="在独立标签页打开：方便同时使用 Trends Bar 侧边栏" aria-label="在新标签页打开工作台">↗</button>
+      <div class="topbar-dot" title="本地数据，零云端依赖">LOCAL</div>
+    </header>
+    <nav class="tabs" aria-label="主要页面">
+      <button data-nav="today" class="tab active">今日清单</button>
+      <button data-nav="records" class="tab">线索库</button>
+      <button data-nav="insights" class="tab">数据概览</button>
+      <button data-nav="settings" class="tab">设置</button>
+    </nav>
+    <main id="main" tabindex="-1"></main>
+    <footer class="footer">只记录真实证据，不为凑数创造需求 · v1.1</footer>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <input id="import-input" type="file" accept=".json,application/json" hidden />
+  <script type="module" src="app.js"></script>
+</body>
+</html>

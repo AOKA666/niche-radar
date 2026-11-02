@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Niche Radar - 每日需求挖掘",
+  "short_name": "Niche Radar",
+  "description": "90分钟 Micro-SaaS 需求研究：新词、老词、任务倒计时提醒、线索记录和 CSV/JSON 导出。",
+  "version": "1.1.0",
+  "minimum_chrome_version": "116",
+  "permissions": ["storage", "alarms", "notifications", "sidePanel", "contextMenus"],
+  "optional_host_permissions": ["https://*.supabase.co/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "action": { "default_title": "打开 Niche Radar 每日需求清单" },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
