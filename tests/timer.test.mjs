@@ -99,6 +99,17 @@ test('background schedules, pauses, resumes, adjusts duration and alerts on comp
     assert.equal(badge,'');
     assert.equal(alarms.has('nr-timer-badge'),false);
     assert.equal(alarms.has('nr-task-countdown'),false);
+    await send({type:'NR_TIMER_ACTION',action:'start',taskId:'trends'});
+    time+=60000;
+    await send({type:'NR_TIMER_ACTION',action:'pause',taskId:'trends'});
+    time+=120000;
+    await send({type:'NR_TIMER_ACTION',action:'resume',taskId:'trends'});
+    time+=30000;
+    await send({type:'NR_TIMER_ACTION',action:'complete',taskId:'trends'});
+    assert.equal(saved.nr_time_history.at(-1).actualMs,90000);
+    assert.equal(saved.nr_time_history.at(-1).plannedMs,12*60000);
+    assert.ok(saved.nr_progress[saved.nr_time_history.at(-1).dayKey].includes('trends'));
+    assert.equal(saved.nr_timer,null);
   }finally{
     Date.now=realNow;
     delete globalThis.chrome;

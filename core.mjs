@@ -6,19 +6,19 @@ export const TASKS = [
     tip: '按种子词组轮换，用 Trends Bar 批量比较美国市场近 30 / 90 天趋势；从 Related queries → Rising 留下有工具意图的词。',
     steps: ['选择今天的一组种子词', '批量查看趋势与 Rising 相关查询', '记录最多 3 个真实搜索信号'],
     links: [ ['打开 Google Trends', 'https://trends.google.com/trends/explore?geo=US'], ['Trends Bar 官方入口', 'https://trendsbar.net/zh'] ] },
-  { id: 'discovery', phase: '新词', minutes: 8, title: '发现新技术 / 新产品', icon: 'spark',
-    tip: '每天只用一个来源。提取真正的新技术名称、格式、协议与工作流，不把 AI 随手编的组合词当需求。',
-    steps: ['打开今日轮值平台', '浏览近期项目或讨论', '收录 1—2 个有出处的新名词'], links: [] },
+  { id: 'discovery', phase: '新词', minutes: 8, title: '增长词证据整理', icon: 'spark',
+    tip: '从 Trends 的增长查询提取具体任务词，记录首次发现日期与趋势链接。',
+    steps: ['整理增长查询', '排除新闻事件与无工具意图的词', '保存趋势证据，缺证据则待观察'], links: [] },
   { id: 'suggest', phase: '新词', minutes: 5, title: 'Google 补全验证', icon: 'search',
     tip: '从本日候选选最多 2 个，在英文 Google 输入名称和 integration / API / converter / alternative 等组合，观察补全；记录首次观察日期。',
     steps: ['验证不超过 2 个名词', '记下出现的补全和相关词', '不出现时标记待复查，不硬造需求'],
     links: [ ['Google 英文搜索', 'https://www.google.com/?hl=en'] ] },
   { id: 'products', phase: '老词', minutes: 20, title: '从真实小产品发现需求', icon: 'target',
-    tip: 'TrustMRR 看已经有收入的小产品；Toolify 看细分工具；插件生态看真实使用场景。每天固定轮换，最多深看 2 个。',
+    tip: '按本周执行卡使用 TrustMRR、Product Hunt 历史榜、AlternativeTo；GitHub / AppSumo 按周轮换。扫描限制在 30—60 分钟。',
     steps: ['打开今日轮值目录', '浏览 8—12 个，深看最多 2 个', '记录目标用户、核心任务、价格或收入证据'], links: [] },
   { id: 'reverse', phase: '老词', minutes: 15, title: '竞品 → 非品牌关键词', icon: 'layers',
     tip: '从产品主页的 H1、功能页、FAQ 和价格页提取真实用语，去掉品牌，寻找用户会搜索的具体任务词。不要强行套 checker / generator。',
-    steps: ['挑最多 2 个产品', '提取客户 × 任务 × 场景的用语', '搜索 Google 并记录最多 2 个长尾词'],
+    steps: ['挑最多 2 个产品', '按人群、地区、功能、格式四个方向细分', '搜索 Google 并记录最多 2 个长尾词'],
     links: [ ['打开 Google', 'https://www.google.com/?hl=en'] ] },
   { id: 'validate', phase: '验证', minutes: 20, title: 'SERP 与商业可行性', icon: 'check',
     tip: '最多查看 3 个候选：检查搜索意图、Google 前十是否有切口、付费证据、API/维护成本。没有证据就留 B，不要为了数量硬给 A。',
@@ -30,25 +30,27 @@ export const TASKS = [
 ];
 
 export const DAY_NAMES = ['周日','周一','周二','周三','周四','周五','周六'];
-export const NEW_SOURCES = [
-  {label:'本周新词复查',url:'https://trends.google.com/trends/explore?geo=US',source:'Google Trends'},
-  {label:'GitHub · 最近新项目',url:'https://github.com/search?q=agent+created%3A%3E2026-10-01+stars%3A%3E20&type=repositories',source:'GitHub'},
-  {label:'Hacker News · 近期讨论',url:'https://hn.algolia.com/?dateRange=pastWeek&sort=byDate',source:'Hacker News'},
-  {label:'Product Hunt · 日榜',url:'https://www.producthunt.com/leaderboard',source:'Product Hunt'},
-  {label:'GitHub · 新工具与协议',url:'https://github.com/search?type=repositories',source:'GitHub'},
-  {label:'Hacker News · Show HN',url:'https://news.ycombinator.com/show',source:'Hacker News'},
-  {label:'Product Hunt · 周末新品',url:'https://www.producthunt.com/leaderboard',source:'Product Hunt'}
-];
-export const OLD_SOURCES = [
-  {label:'B 类候选复查',url:'https://www.google.com/?hl=en',source:'Google SERP'},
-  {label:'TrustMRR · 盈利小产品',url:'https://trustmrr.com/',source:'TrustMRR'},
-  {label:'Toolify · 细分类目',url:'https://www.toolify.ai/',source:'Toolify'},
-  {label:'Chrome / Shopify / WordPress 插件',url:'https://chromewebstore.google.com/',source:'插件生态'},
-  {label:'TrustMRR · 换个行业',url:'https://trustmrr.com/',source:'TrustMRR'},
-  {label:'Toolify · 换个类别',url:'https://www.toolify.ai/new',source:'Toolify'},
-  {label:'Google · 小站和替代品',url:'https://www.google.com/?hl=en',source:'Google SERP'}
-];
-export const SOURCE_OPTIONS = ['Trends Bar','Google Trends','Google 自动补全','GitHub','Hacker News','Product Hunt','TrustMRR','Toolify','Chrome Web Store','Shopify App Store','WordPress','Google SERP','其他'];
+export const NEW_SOURCES = Array.from({length:7},()=>({label:'Google Trends · 增长搜索需求',url:'https://trends.google.com/trends/explore?geo=US',source:'Google Trends'}));
+export const OLD_SOURCES = Array.from({length:7},(_,day)=>day===3?{label:'AlternativeTo · 细分替代品',url:'https://alternativeto.net/browse/',source:'AlternativeTo'}:{label:'TrustMRR · 收入证据',url:'https://trustmrr.com/',source:'TrustMRR'});
+export function weeklyPlan(date=new Date()){
+ const week=Math.floor((Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())-Date.UTC(2024,0,1))/604800000);
+ const alternate=week%2===0?['GitHub Topics','https://github.com/topics','README + Issues，记录 2 个具体痛点；没有真实用户场景就结束']:['AppSumo','https://appsumo.com/','阅读购买评价，记录 2 个具体痛点'];
+ const history=`https://www.producthunt.com/leaderboard/monthly/${date.getFullYear()-3}/${date.getMonth()+1}`;
+ const plan = [
+ {title:'周末 · MVP 与首次推广',ids:['record'],goal:'最多两天完成 MVP、部署、埋点和首次推广；证据不足允许本周不上线。',channels:[]},
+ {title:'周一 · 新词发现',ids:['trends','discovery','suggest','record'],goal:'Google Trends + Trends Bar，收集 10 个有增长证据的候选；数量是上限目标，不凑数。',channels:[['Google Trends','https://trends.google.com/trends/explore','比较近期增长与历史趋势']]},
+ {title:'周二 · 老词发现',ids:['products','reverse','record'],goal:'TrustMRR 找 3 个收入证据产品，Product Hunt 历史榜找 3 个任务词。',channels:[['TrustMRR','https://trustmrr.com/','15 分钟；区分总收入与订阅收入，记录用户、收费、功能和获客渠道'],['Product Hunt 历史榜',history,'15 分钟；翻 2—4 年前的产品，跳过大平台，核实今天是否仍有同类需求']]},
+ {title:'周三 · 老词补充',ids:['products','reverse','record'],goal:'AlternativeTo 找 2 个细分机会，GitHub / AppSumo 按周轮换找 2 个痛点。',channels:[['AlternativeTo','https://alternativeto.net/browse/','15 分钟；从成熟产品寻找更简单、单任务、特定平台的替代品'],alternate,['Capterra','https://www.capterra.com/','按需：垂直行业与用户差评'],['Toolify','https://www.toolify.ai/','辅助：AI 工具分类，不作为唯一证据']]},
+ {title:'周四 · 竞争验证',ids:['suggest','validate','record'],goal:'选 3 个候选：Google 前十、搜索需求、竞品、技术和获客难度；老词查看过去 5 年趋势。',channels:[['Google','https://www.google.com/?hl=en','查看专业工具和可进入的切口'],['Google Trends','https://trends.google.com/trends/explore','检查长期需求；低搜索量但有 B2B 付费证据可考虑直接获客']]},
+ {title:'周五 · 付费与最终选题',ids:['validate','record'],goal:'深入研究 1—2 个方向，至少核实 1 个收费证据，最终选 0—1 个可开发机会。',channels:[]},
+ {title:'周末 · MVP 与首次推广',ids:['record'],goal:'最多两天完成 MVP、部署、埋点和首次推广；证据不足允许本周不上线。',channels:[]}
+ ][date.getDay()];
+ return {...plan,
+   ids:[...new Set(['trends','discovery','suggest',...plan.ids])],
+   goal:'每天先看新词：Google Trends / Trends Bar 扫描增长趋势，整理证据并检查搜索补全；没有可靠候选就不凑数。'+plan.goal
+ };
+}
+export const SOURCE_OPTIONS = ['AlternativeTo','AppSumo','Capterra','Trends Bar','Google Trends','Google 自动补全','GitHub','Hacker News','Product Hunt','TrustMRR','Toolify','Chrome Web Store','Shopify App Store','WordPress','Google SERP','其他'];
 export const MIN_TASK_MINUTES = 1;
 export const MAX_TASK_MINUTES = 240;
 export const DEFAULT_MINUTES = Object.fromEntries(TASKS.map(t=>[t.id,t.minutes]));
@@ -73,6 +75,10 @@ export function normalizeTimer(raw) {
   if(!Number.isFinite(remainingMs) || remainingMs<0 || remainingMs>24*60*60000)return null;
   if(raw.status==='running' && (!Number.isFinite(endAt)||endAt<=0))return null;
   return {
+    startedAt:Number(raw.startedAt)||null,
+    elapsedMs:Math.max(0,Number(raw.elapsedMs)||0),
+    segmentAt:Number(raw.segmentAt)||null,
+    plannedMs:Math.max(0,Number(raw.plannedMs)||remainingMs),
     taskId:raw.taskId,
     status:raw.status,
     endAt:raw.status==='running'?endAt:null,
@@ -140,6 +146,9 @@ export function normalizeRecord(raw={}) {
     type,
     source: text(raw.source,100) || '其他',
     url: safeExternalUrl(raw.url),
+    product: text(raw.product),
+    targetUser: text(raw.targetUser),
+    demandStrength: text(raw.demandStrength),
     userNeed: text(raw.userNeed),
     searchEvidence: text(raw.searchEvidence),
     competition: text(raw.competition),
@@ -160,7 +169,7 @@ export function csvCell(value) {
 }
 export const CSV_FIELDS = [
   ['date','发现日期'],['keyword','关键词/产品'],['type','新词/老词'],['source','来源'],['url','来源链接'],
-  ['userNeed','用户与任务'],['searchEvidence','搜索证据'],['competition','SERP/竞争'],['payment','付费证据'],
+  ['product','对标产品'],['targetUser','目标用户'],['demandStrength','需求强度'],['userNeed','用户与任务'],['searchEvidence','搜索证据'],['competition','SERP/竞争'],['payment','付费证据'],
   ['risk','成本和风险'],['grade','评级'],['reviewDate','复查日期'],['notes','备注'],['createdAt','创建时间']
 ];
 export function recordsToCSV(records) {

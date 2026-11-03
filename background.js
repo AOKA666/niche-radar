@@ -27,11 +27,15 @@ async function updateBadge(timer){
   await chrome.action.setTitle({title:!timer?'打开 Niche Radar 每日需求清单':`${TASKS.find(t=>t.id===timer.taskId)?.title} · ${timer.status==='expired'?'时间已到':timer.status==='paused'?'已暂停':'剩余'} ${text}`});
 }
 
+function settle(timer,now=Date.now()){
+ if(timer?.status==='running')return {...timer,elapsedMs:(timer.elapsedMs||0)+Math.max(0,Math.min(now,timer.endAt)-(timer.segmentAt||timer.endAt-timer.remainingMs)),segmentAt:now};
+ return timer;
+}
 async function notifyExpired(taskId){
   const task=TASKS.find(t=>t.id===taskId);
   // Window and system notification are independent: either may fail on its own.
   await Promise.allSettled([
-    chrome.windows.create({url:chrome.runtime.getURL('reminder.html')+'?task='+encodeURIComponent(taskId),type:'popup',width:440,height:330,focused:true}),
+    chrome.windows.create({url:chrome.runtime.getURL('reminder.html')+'?task='+encodeURIComponent(taskId),type:'popup',width:440,height:410,focused:true}),
     chrome.notifications.create(TIMER_NOTIFICATION,{
     type:'basic',iconUrl:'icons/icon128.png',
     title:'⏰ 本项任务时间到了',
@@ -55,7 +59,7 @@ async function expireIfNeeded(){
   const data=await chrome.storage.local.get('nr_timer');
   const timer=normalizeTimer(data.nr_timer);
   if(timer?.status==='running' && timer.endAt<=Date.now()){
-    const expired={...timer,status:'expired',remainingMs:0,endAt:null};
+    const expired={...settle(timer),status:'expired',remainingMs:0,endAt:null};
     await chrome.storage.local.set({nr_timer:expired});
     await scheduleTimer(expired);
     await notifyExpired(timer.taskId);
@@ -77,6 +81,7 @@ async function act(message){
   const settings=normalizeSettings(data.nr_settings);
   let timer=normalizeTimer(data.nr_timer);
   const now=Date.now();
+  timer=settle(timer,now);
 
   if(message.type==='NR_RESET_DURATIONS'){
     await chrome.storage.local.set({nr_settings:{taskMinutes:{...DEFAULT_MINUTES}}});
@@ -113,7 +118,7 @@ async function act(message){
   const action=message.action;
   if(action==='start'||action==='reset'){
     const remainingMs=settings.taskMinutes[taskId]*60000;
-    timer={taskId,status:'running',endAt:now+remainingMs,remainingMs,dayKey:localDayKey()};
+    timer={taskId,status:'running',endAt:now+remainingMs,remainingMs,dayKey:localDayKey(),startedAt:now,segmentAt:now,elapsedMs:0,plannedMs:remainingMs};
   } else if(action==='pause'){
     if(timer?.taskId!==taskId||timer.status!=='running')return {ok:false,error:'任务未运行'};
     // At the exact deadline, do not allow pause to suppress the alarm.
@@ -128,12 +133,22 @@ async function act(message){
     timer={...timer,status:'paused',endAt:null,remainingMs};
   } else if(action==='resume'){
     if(timer?.taskId!==taskId||timer.status!=='paused')return {ok:false,error:'任务未暂停'};
-    timer={...timer,status:'running',endAt:now+timer.remainingMs};
+    timer={...timer,status:'running',segmentAt:now,endAt:now+timer.remainingMs};
   } else if(action==='extend'){
     if(timer?.taskId!==taskId || !['running','paused','expired'].includes(timer.status))return {ok:false,error:'请先开始任务'};
-    const minutes=normalizeMinutes(message.minutes,5);
+    const minutes=Number(message.minutes);
+    if(!Number.isInteger(minutes)||minutes<1||minutes>240)return {ok:false,error:'延长时间须为 1—240 分钟'};
     const remainingMs=timerRemainingMs(timer,now)+minutes*60000;
-    timer={...timer,status:'running',remainingMs,endAt:now+remainingMs};
+    timer={...timer,status:'running',segmentAt:now,remainingMs,endAt:now+remainingMs};
+  } else if(action==='complete'){
+    if(timer?.taskId!==taskId)return {ok:false,error:'当前计时任务已变化，请刷新后重试'};
+    const stored=await chrome.storage.local.get(['nr_time_history','nr_progress']);
+    const history=Array.isArray(stored.nr_time_history)?stored.nr_time_history:[];
+    const progress=stored.nr_progress||{};
+    const day=timer.dayKey;
+    progress[day]=[...new Set([...(progress[day]||[]),taskId])];
+    await chrome.storage.local.set({nr_time_history:[...history,{taskId,dayKey:day,startedAt:timer.startedAt,completedAt:now,plannedMs:timer.plannedMs,actualMs:timer.elapsedMs}],nr_progress:progress});
+    timer=null;
   } else if(action==='finish'){
     if(timer?.taskId===taskId)timer=null;
     else return {ok:true};

@@ -1,3 +1,4 @@
+import {weeklyPlan} from './core.mjs';
 import {TASKS, DAY_NAMES, NEW_SOURCES,OLD_SOURCES,SOURCE_OPTIONS,DEFAULT_SETTINGS,localDayKey,dayLabel,normalizeRecord,recordsToCSV,clampProgress,safeExternalUrl,normalizeSettings,normalizeTimer,timerRemainingMs,formatCountdown,totalPlannedMinutes} from './core.mjs';
 
 const $=sel=>document.querySelector(sel);
@@ -7,6 +8,7 @@ let entries=[];
 let progress={};
 let settings=normalizeSettings();
 let timer=null;
+let timeHistory=[];
 let filter={query:'',type:'全部',grade:'全部'};
 let editor={open:false,id:null,prefill:{}};
 let expandedTask=null;
@@ -41,25 +43,29 @@ function taskTimerMarkup(task){
  let controls='';
  if(status==='running') controls=`${button('⏸ 暂停','timer-pause-'+task.id,'secondary small')}${button('↺ 重置','timer-reset-'+task.id,'ghost small')}`;
  else if(status==='paused') controls=`${button('▶ 继续','timer-resume-'+task.id,'small')}${button('↺ 重置','timer-reset-'+task.id,'secondary small')}`;
- else if(status==='expired') controls=`${button('＋ 5 分钟','timer-extend-'+task.id,'small')}${button('↺ 重来','timer-reset-'+task.id,'secondary small')}`;
+ else if(status==='expired') controls=`${button('自定义延长','timer-extend-'+task.id,'small')}${button('↺ 重来','timer-reset-'+task.id,'secondary small')}`;
  else controls=button('▶ 开始计时','timer-start-'+task.id,'small');
+ if(active)controls+=button('✓ 完成','timer-complete-'+task.id,'secondary small');
+ const last=timeHistory.filter(r=>r.taskId===task.id&&r.dayKey===localDayKey()).at(-1);
  const remaining=active?formatCountdown(timerRemainingMs(timer)):formatCountdown(mins*60000);
  const stateLabel=active?({running:'计时中',paused:'已暂停',expired:'时间已到'}[status]):'待开始';
  return `<div class="task-timer ${active?'timer-active':''} ${status==='expired'?'timer-expired':''}">
  <label class="minute-editor" for="task-min-${task.id}">计划 <input id="task-min-${task.id}" class="minute-input" data-minute-id="${task.id}" type="number" min="1" max="240" step="1" value="${mins}" aria-label="${h(task.title)}计划时长（分钟）"> 分钟</label>
  <div class="timer-time"><span class="timer-readout" data-timer-readout="${task.id}">${remaining}</span><span class="timer-state">${stateLabel}</span></div>
- <div class="timer-controls">${controls}</div>
+ <div class="timer-controls">${controls}</div>${last?`<p class="hint">预计 ${formatCountdown(last.plannedMs)} · 实际 ${formatCountdown(last.actualMs)} · 完成于 ${h(new Date(last.completedAt).toLocaleTimeString())}</p>`:''}
  </div>`;
 }
 function renderToday(){
- const done=todayCompleted(),count=done.length,todays=todayEntries(),planned=totalPlannedMinutes(settings);
- const minutes=TASKS.filter(t=>done.includes(t.id)).reduce((a,t)=>a+settings.taskMinutes[t.id],0);
+ const plan=weeklyPlan();
+ const todayTasks=TASKS.filter(t=>plan.ids.includes(t.id)||timer?.taskId===t.id);
+ const done=todayCompleted(),count=todayTasks.filter(t=>done.includes(t.id)).length,todays=todayEntries(),planned=todayTasks.reduce((n,t)=>n+settings.taskMinutes[t.id],0);
+ const minutes=todayTasks.filter(t=>done.includes(t.id)).reduce((a,t)=>a+settings.taskMinutes[t.id],0);
  const sections=[['新词阶段','新词'],['老词阶段','老词'],['统一验证','验证'],['归档','归档']];
  const stats={new:todays.filter(r=>r.type==='新词').length,old:todays.filter(r=>r.type==='老词').length};
- const blocks=sections.map(([title,phase])=>{
- const phaseMinutes=TASKS.filter(t=>t.phase===phase).reduce((n,t)=>n+settings.taskMinutes[t.id],0);
+ const blocks=sections.filter(([,phase])=>todayTasks.some(t=>t.phase===phase)).map(([title,phase])=>{
+ const phaseMinutes=todayTasks.filter(t=>t.phase===phase).reduce((n,t)=>n+settings.taskMinutes[t.id],0);
  return `<div class="section-head"><h3>${title} · ${phaseMinutes} 分钟</h3><small>${phase==='新词'?'趋势 + 新技术':phase==='老词'?'盈利小产品 + 工具目录':phase==='验证'?'用证据排除伪需求':'留下下一步行动'}</small></div>`+
- TASKS.filter(t=>t.phase===phase).map(t=>{
+ todayTasks.filter(t=>t.phase===phase).map(t=>{
  const complete=done.includes(t.id),isOpen=expandedTask===t.id,source=taskSource(t.id);
  return `<article class="task-card ${complete?'complete':''} ${timer?.taskId===t.id?'timer-current':''}">
  <div class="task-primary"><input type="checkbox" class="task-check" data-task="${t.id}" ${complete?'checked':''} aria-label="完成：${h(t.title)}" />
@@ -70,13 +76,13 @@ function renderToday(){
  }).join('');
  }).join('');
  const activeTask=timer&&TASKS.find(t=>t.id===timer.taskId);
- const activeLine=activeTask?`<div class="active-timer-summary"><div><div class="active-timer-label">${timer.status==='expired'?'⏰ 时间已到':timer.status==='paused'?'⏸ 已暂停':'⏱ 当前计时'} · ${h(activeTask.title)}</div><strong data-active-countdown>${formatCountdown(timerRemainingMs(timer))}</strong></div>${timer.status==='running'?button('暂停','timer-pause-'+timer.taskId,'secondary small'):timer.status==='paused'?button('继续','timer-resume-'+timer.taskId,'small'):button('＋ 5 分钟','timer-extend-'+timer.taskId,'small')}</div>`:
+ const activeLine=activeTask?`<div class="active-timer-summary"><div><div class="active-timer-label">${timer.status==='expired'?'⏰ 时间已到':timer.status==='paused'?'⏸ 已暂停':'⏱ 当前计时'} · ${h(activeTask.title)}</div><strong data-active-countdown>${formatCountdown(timerRemainingMs(timer))}</strong></div>${timer.status==='running'?button('暂停','timer-pause-'+timer.taskId,'secondary small'):timer.status==='paused'?button('继续','timer-resume-'+timer.taskId,'small'):button('自定义延长','timer-extend-'+timer.taskId,'small')}</div>`:
  '<div class="active-timer-intro">点击下方任一任务的「开始计时」，才会启动倒计时；不会每天固定时间提醒。</div>';
  return `<div class="page-header"><div><div class="eyebrow">DAILY RESEARCH</div><h1 class="page-title">今天挖什么？</h1><p class="page-sub">${h(dayLabel())} · 每项任务独立计时，时间可修改</p></div></div>
- <section class="hero"><div class="micro">TODAY'S RESEARCH ROUTINE</div><h2>${minutes}<span>/ ${planned} 分钟计划</span></h2><p>新词看趋势，老词看真实产品。任务计时到点会弹出提醒。</p><div class="hero-progress"><div style="width:${Math.round(count/TASKS.length*100)}%"></div></div><div class="hero-foot"><span>已完成 ${count} / ${TASKS.length} 项</span><span>${Math.round(count/TASKS.length*100)}%</span></div></section>
+ <section class="hero"><div class="micro">TODAY'S RESEARCH ROUTINE</div><h2>${minutes}<span>/ ${planned} 分钟计划</span></h2><p>新词看趋势，老词看真实产品。任务计时到点会弹出提醒。</p><div class="hero-progress"><div style="width:${Math.round(count/todayTasks.length*100)}%"></div></div><div class="hero-foot"><span>已完成 ${count} / ${todayTasks.length} 项</span><span>${Math.round(count/todayTasks.length*100)}%</span></div></section>
  <div class="live-timer-panel">${activeLine}</div>
  <div class="metric-row"><div class="metric"><strong>${stats.new}</strong><span>今日新词线索</span></div><div class="metric"><strong>${stats.old}</strong><span>今日老词线索</span></div><div class="metric"><strong>${todays.filter(r=>r.grade==='A').length}</strong><span>今日 A 级机会</span></div></div>
- <div class="notice">⏱ 修改任一任务的分钟数后会自动保存。任务到点后提醒一次，你可以标记完成、延长 5 分钟或重新计时。</div>
+ <div class="notice">⏱ 修改任一任务的分钟数后会自动保存。任务到点后提醒一次，你可以标记完成、自定义延长或提前完成。</div>
  ${blocks}<div class="button-row spaced">${button('＋ 记录一条线索','add-record')}${button('查看线索库','go-records','secondary')}</div>`;
 }
 function renderRecords(){
@@ -105,11 +111,12 @@ function renderEditor(){
  <div class="field-row"><div class="field"><label>类型</label>${selectField('type',['新词','老词'],rec.type||'新词')}</div><div class="field"><label>来源</label>${selectField('source',SOURCE_OPTIONS,rec.source||'Google Trends')}</div></div>
  <div class="field"><label>原始来源链接</label><input name="url" type="url" placeholder="https://…" value="${h(rec.url)}" /></div>
  <div class="field"><label>目标用户 / 具体任务</label><textarea name="userNeed" placeholder="谁在什么场景，要完成什么工作？">${h(rec.userNeed)}</textarea></div>
+ ${[['product','对标产品（名称，网址填写来源 URL）'],['targetUser','目标用户'],['demandStrength','需求强度（频率 / 重要性）']].map(([name,label])=>`<div class="field"><label>${label}</label><input name="${name}" value="${h(rec[name])}" /></div>`).join('')}
  <div class="field"><label>真实搜索信号</label><textarea name="searchEvidence" placeholder="Trends 增长、自动补全、Search Console 曝光等；没证据就写“待验证”">${h(rec.searchEvidence)}</textarea></div>
  <div class="field"><label>Google SERP / 竞争切口</label><textarea name="competition" placeholder="前 10 名有什么专用工具？是否有可进入的细分场景？">${h(rec.competition)}</textarea></div>
  <div class="field"><label>付费证据</label><textarea name="payment" placeholder="竞品价格、营收指标的口径、付费试点等">${h(rec.payment)}</textarea></div>
  <div class="field"><label>开发成本和风险</label><textarea name="risk" placeholder="API 成本、数据依赖、平台审核、SEO 难度…">${h(rec.risk)}</textarea></div>
- <div class="field-row"><div class="field"><label>结论</label>${selectField('grade',['待定','A','B','C'],rec.grade||'待定')}</div><div class="field"><label>复查日期（可选）</label><input type="date" name="reviewDate" value="${h(rec.reviewDate)}" /></div></div>
+ <div class="field-row"><div class="field"><label>结论（A 继续 / B 待观察 / C 放弃）</label>${selectField('grade',['待定','A','B','C'],rec.grade||'待定')}</div><div class="field"><label>复查日期（可选）</label><input type="date" name="reviewDate" value="${h(rec.reviewDate)}" /></div></div>
  <div class="field"><label>备注</label><textarea name="notes" placeholder="下一步要验证什么？">${h(rec.notes)}</textarea></div>
  <div class="button-row"><button class="btn" type="submit">${editor.id?'保存修改':'保存线索'}</button>${button('取消','close-editor','secondary')}</div>
  </form></section>`;
@@ -117,7 +124,7 @@ function renderEditor(){
 function recentDates(num){const days=[];for(let i=0;i<num;i++){const d=new Date();d.setDate(d.getDate()-i);days.push(localDayKey(d));}return days;}
 function renderInsights(){
  const dates=recentDates(7),inWeek=entries.filter(x=>dates.includes(x.date));
- const doneDays=dates.filter(d=>(progress[d]||[]).length===TASKS.length).length;
+ const doneDays=dates.filter(d=>weeklyPlan(new Date(d+'T12:00:00')).ids.every(id=>(progress[d]||[]).includes(id))).length;
  const sources=[...new Set(entries.map(x=>x.source))].map(s=>[s,entries.filter(x=>x.source===s).length]).sort((a,b)=>b[1]-a[1]).slice(0,7);
  const toReview=entries.filter(x=>x.grade==='B'&&x.reviewDate&&x.reviewDate<=localDayKey()).sort((a,b)=>a.reviewDate.localeCompare(b.reviewDate));
  return `<div class="page-header"><div><div class="eyebrow">WEEKLY PULSE</div><h1 class="page-title">数据概览</h1><p class="page-sub">看哪些来源真正产出机会，而不是只看关键词数量</p></div></div>
@@ -147,7 +154,7 @@ function render(){main.innerHTML=view==='today'?renderToday():view==='records'?r
 function openEditor(id=null,prefill={}){editor={open:true,id,prefill};show('records');setTimeout(()=>$('#record-form input[name="keyword"]')?.focus(),30);}
 function formValue(fd,name){return String(fd.get(name)||'').trim();}
 async function saveRecord(form){const fd=new FormData(form);const old=entries.find(x=>x.id===editor.id);const now=new Date().toISOString();
- const raw={...old,id:old?.id||(typeof crypto.randomUUID==='function'?crypto.randomUUID():`nr-${Date.now()}-${Math.random().toString(16).slice(2)}`),date:old?.date||localDayKey(),keyword:formValue(fd,'keyword'),type:formValue(fd,'type'),source:formValue(fd,'source'),url:formValue(fd,'url'),userNeed:formValue(fd,'userNeed'),searchEvidence:formValue(fd,'searchEvidence'),competition:formValue(fd,'competition'),payment:formValue(fd,'payment'),risk:formValue(fd,'risk'),grade:formValue(fd,'grade'),reviewDate:formValue(fd,'reviewDate'),notes:formValue(fd,'notes'),createdAt:old?.createdAt||now,updatedAt:now};
+ const raw={...old,id:old?.id||(typeof crypto.randomUUID==='function'?crypto.randomUUID():`nr-${Date.now()}-${Math.random().toString(16).slice(2)}`),date:old?.date||localDayKey(),keyword:formValue(fd,'keyword'),type:formValue(fd,'type'),source:formValue(fd,'source'),url:formValue(fd,'url'),product:formValue(fd,'product'),targetUser:formValue(fd,'targetUser'),demandStrength:formValue(fd,'demandStrength'),userNeed:formValue(fd,'userNeed'),searchEvidence:formValue(fd,'searchEvidence'),competition:formValue(fd,'competition'),payment:formValue(fd,'payment'),risk:formValue(fd,'risk'),grade:formValue(fd,'grade'),reviewDate:formValue(fd,'reviewDate'),notes:formValue(fd,'notes'),createdAt:old?.createdAt||now,updatedAt:now};
  const rec=normalizeRecord(raw);if(!rec.keyword){toast('请输入关键词或产品名称');return;}
  if(raw.url&&!rec.url){toast('来源 URL 无效，只允许 http/https');return;}
  const dup=entries.some(x=>x.id!==rec.id&&x.keyword.toLowerCase()===rec.keyword.toLowerCase()&&x.type===rec.type);
@@ -198,10 +205,12 @@ document.addEventListener('click',async e=>{
    if(!TASKS.some(t=>t.id===taskId))return;
    if((cmd==='start'||cmd==='reset')&&timer&&timer.taskId!==taskId&&
       !confirm('另一项任务正在计时或尚未结束。开始此任务会替换原计时，继续吗？'))return;
-   const res=await chrome.runtime.sendMessage({type:'NR_TIMER_ACTION',action:cmd,taskId,minutes:5});
+   let minutes=5;
+   if(cmd==='extend'){const value=prompt('延长多少分钟？（1—240）','5');if(value===null)return;minutes=Number(value);if(!Number.isInteger(minutes)||minutes<1||minutes>240){toast('请输入 1—240 的整数');return;}}
+   const res=await chrome.runtime.sendMessage({type:'NR_TIMER_ACTION',action:cmd,taskId,minutes});
    if(!res?.ok)toast(res?.error||'计时操作失败');
    else if(cmd==='start')toast('已开始计时，到点后将弹出提醒');
-   else if(cmd==='extend')toast('已延长 5 分钟');
+   else if(cmd==='extend')toast('已延长 '+minutes+' 分钟');
    return;
  }
  if(action==='test-notification'){try{const res=await chrome.runtime.sendMessage({type:'NR_TEST_NOTIFICATION'});toast(res?.ok?'已请求显示系统通知':'通知发送失败，检查系统通知权限');}catch{toast('通知测试失败');}return;}
@@ -213,7 +222,7 @@ document.addEventListener('change',async e=>{
  if(e.target.checked)tasks.add(id);else tasks.delete(id);
  progress[day]=[...tasks];
  if(e.target.checked&&timer?.taskId===id){
-   await chrome.runtime.sendMessage({type:'NR_TIMER_ACTION',action:'finish',taskId:id});
+   await chrome.runtime.sendMessage({type:'NR_TIMER_ACTION',action:'complete',taskId:id});
  }
  await saveProgress();render();
  }
@@ -245,11 +254,12 @@ $('#import-input').addEventListener('change',async e=>{await restoreJson(e.targe
 
 async function init(){
  try{
- const data=await chrome.storage.local.get(['nr_records','nr_progress','nr_settings','nr_timer']);
+ const data=await chrome.storage.local.get(['nr_records','nr_progress','nr_settings','nr_timer','nr_time_history']);
  entries=Array.isArray(data.nr_records)?data.nr_records.map(normalizeRecord).filter(x=>x.keyword):[];
  progress=clampProgress(data.nr_progress);
  settings=normalizeSettings(data.nr_settings);
  timer=normalizeTimer(data.nr_timer);
+ timeHistory=Array.isArray(data.nr_time_history)?data.nr_time_history:[];
  render();
  }catch(err){main.innerHTML='<div class="empty">读取本地数据失败。请刷新扩展页面，或重新加载扩展。<br/>如果问题持续，请查看扩展 Service Worker 控制台。</div>';console.error(err);}
 }
@@ -258,6 +268,7 @@ chrome.storage.onChanged.addListener((changes,area)=>{
  if(changes.nr_records)entries=Array.isArray(changes.nr_records.newValue)?changes.nr_records.newValue:[];
  if(changes.nr_progress)progress=clampProgress(changes.nr_progress.newValue);
  if(changes.nr_settings)settings=normalizeSettings(changes.nr_settings.newValue);
+ if(changes.nr_time_history)timeHistory=changes.nr_time_history.newValue||[];
  if(changes.nr_timer)timer=normalizeTimer(changes.nr_timer.newValue);
  // Avoid replacing a form while the user is typing.
  if(!editor.open)render();
